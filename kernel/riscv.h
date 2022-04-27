@@ -1,3 +1,5 @@
+#include "types.h"
+
 // which hart (core) is this?
 static inline uint64
 r_mhartid()
@@ -364,3 +366,38 @@ sfence_vma()
 
 typedef uint64 pte_t;
 typedef uint64 *pagetable_t; // 512 PTEs
+
+
+// load and store
+
+// load 32-bit
+static inline uint32
+lw(uint32 offset, uint32 rs1)
+{
+  uint32 x;
+  asm volatile("lw %0, %1(%2)" : "=r" (x) : "r" (offset), "r" (rs1));
+  return x;
+}
+
+// load 16-bit
+static inline uint16
+lh(uint32 offset, uint32 rs1)
+{
+  uint16 x;
+  asm volatile("lh %0, %1(%2)" : "=r" (x) : "r" (offset), "r" (rs1));
+  return x;
+}
+
+// store 32-bit
+static inline void
+sw(uint32 rs2, uint32 offset, uint32 rs1)
+{
+  asm volatile("sw %0, %1(%2)" : : "r" (rs2), "r" (offset), "r" (rs1));
+}
+
+// store 16-bit
+static inline void
+sh(uint16 rs2, uint32 offset, uint32 rs1)
+{
+  asm volatile("sw %0, %1(%2)" : : "r" (rs2), "r" (offset), "r" (rs1));
+}

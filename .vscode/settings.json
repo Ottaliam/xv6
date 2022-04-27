@@ -1,5 +1,8 @@
 {
     "files.associations": {
-        "types.h": "c"
+        "types.h": "c",
+        "defs.h": "c",
+        "stdarg.h": "c",
+        "pci.h": "c"
     }
 }
