@@ -51,7 +51,7 @@ ac97_init()
             if(vedeID == 0x24158086)
             {
                 printf("Successfully Find AC97\n");
-                ac97_device_init(address);
+                //ac97_device_init(address);
                 return;
             }
         }
