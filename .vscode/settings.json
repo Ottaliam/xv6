@@ -3,6 +3,8 @@
         "types.h": "c",
         "defs.h": "c",
         "stdarg.h": "c",
-        "pci.h": "c"
+        "pci.h": "c",
+        "proc.h": "c",
+        "memlayout.h": "c"
     }
 }
