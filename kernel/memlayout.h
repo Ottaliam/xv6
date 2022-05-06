@@ -27,6 +27,7 @@
 
 // pci mmio interface
 #define PCI0    0x30000000L
+#define PCIBAR  0x40000000L
 
 // core local interruptor (CLINT), which contains the timer.
 #define CLINT 0x2000000L

@@ -28,7 +28,8 @@ main()
     iinit();         // inode table
     fileinit();      // file table
     virtio_disk_init(); // emulated hard disk
-    ac97_init();      // ac97 audio controller
+    //ac97_init();      // ac97 audio controller
+    soundinit();
     userinit();      // first user process
     __sync_synchronize();
     started = 1;

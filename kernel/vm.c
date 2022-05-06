@@ -24,6 +24,10 @@ kvmmake(void)
   kpgtbl = (pagetable_t) kalloc();
   memset(kpgtbl, 0, PGSIZE);
 
+  // ? pcie mmio
+  kvmmap(kpgtbl, 0, 0, 0x100000, PTE_R | PTE_W);
+  kvmmap(kpgtbl, 0x3000000L, 0x3000000L, 0x100000, PTE_R | PTE_W);
+
   // uart registers
   kvmmap(kpgtbl, UART0, UART0, PGSIZE, PTE_R | PTE_W);
 
@@ -34,7 +38,8 @@ kvmmake(void)
   kvmmap(kpgtbl, PLIC, PLIC, 0x400000, PTE_R | PTE_W);
 
   // pci mmio
-  kvmmap(kpgtbl, PCI0, PCI0, 0x10000000, PTE_R | PTE_W);
+  kvmmap(kpgtbl, PCI0, PCI0, 0x10000000L, PTE_R | PTE_W);
+  kvmmap(kpgtbl, PCIBAR, PCIBAR, 0x40000000L, PTE_R | PTE_W);
 
   // map kernel text executable and read-only.
   kvmmap(kpgtbl, KERNBASE, KERNBASE, (uint64)etext-KERNBASE, PTE_R | PTE_X);
