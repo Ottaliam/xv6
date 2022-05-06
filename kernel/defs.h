@@ -183,9 +183,8 @@ void            virtio_disk_rw(struct buf *, int);
 void            virtio_disk_intr(void);
 
 // ac97.c
-//void            ac97_init();
-//void            ac97_device_init(uint32 pci_config);
-void              soundinit();
+void            ac97_init();
+void            ac97_device_init(uint64 pci_addr);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
