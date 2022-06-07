@@ -67,39 +67,45 @@ void ac97_device_init(uint64 pci_addr)
     WriteRegShort(pci_addr + PCI_CONFIG_COMMAND, 0x5);
 
     // BAR set
-    WriteRegInt(pci_addr + PCI_CONFIG_BAR0, 0x0001);
+    // Using 0x0001 here will cause Store/AMO access fault, reason unknown
+    WriteRegInt(pci_addr + PCI_CONFIG_BAR0, 0x0401);
     NAMBA = ReadRegInt(pci_addr + PCI_CONFIG_BAR0) & (~0x1);
 
-    WriteRegInt(pci_addr + PCI_CONFIG_BAR1, 0x0401);
+    WriteRegInt(pci_addr + PCI_CONFIG_BAR1, 0x0801);
     NABMBA = ReadRegInt(pci_addr + PCI_CONFIG_BAR1) & (~0x1);
 
-    __sync_synchronize();
-
-    printf("BAR Successfully Set\n");
-    printf("BAR0: %p\nBAR1: %p\n", NAMBA, NABMBA);
+    // printf("BAR Successfully Set\n");
+    // printf("BAR0: %p\nBAR1: %p\n", NAMBA, NABMBA);
 
     // Cold Reset Without Interrupt
-    WriteRegInt(PCIE_PIO | (NABMBA + GLOBAL_CONTROL), 0x2);
-    
-    printf("Reset Success\n");
+    WriteRegByte(PCIE_PIO | (NABMBA + GLOBAL_CONTROL), 0x2);
+    // printf("Reset Success\n");
 
-    // Wait For Codec to be Ready
-    while(!(ReadRegShort(PCIE_PIO | (NABMBA + GLOBAL_STATUS)) & 0x100));
-
-    printf("Codec Ready\n");
+    // Wait For Codec to be Read
+    uint32 wait_time = 1000;
+    while(!(ReadRegShort(PCIE_PIO | (NABMBA + GLOBAL_STATUS)) & 0x100) && wait_time)
+        --wait_time;
+    if(!wait_time)
+    {
+        panic("Audio Init Failed 0.\n");
+        return;
+    }
+    // printf("Codec Ready\n");
 
     // Check Codec
     WriteRegShort(PCIE_PIO | (NAMBA + MA_VOLUME), 0x8000);
-    if(ReadRegShort(PCIE_PIO | (NAMBA + MA_VOLUME)) != 0x8000)
+    if((ReadRegShort(PCIE_PIO | (NAMBA + MA_VOLUME))) != 0x8000)
     {
         panic("Codec Fail\n");
         return;
     }
 
-    
-
     // Reset NAM Registers
     // WriteRegShort(PCIE_PIO | (NAMBA + RESET), 0x1);
-    // Reset Register Not Available due to Unknown Reason, Manually Reset:
-    // todo: reset here
+
+    // Update PCIe Audio Subsystem ID
+    uint32 v01 = ReadRegShort(PCIE_PIO | (NAMBA + 0x7C));
+    uint32 v02 = ReadRegShort(PCIE_PIO | (NAMBA + 0x7E));
+    uint32 v00 = (v02 << 16) + v01;
+    WriteRegInt(pci_addr + 0x2C, v00);
 }
