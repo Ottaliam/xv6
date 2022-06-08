@@ -29,12 +29,15 @@ void WriteRegShort(uint64 reg, ushort v) {*RegShort(reg) = v;}
 #define PCI_CONFIG_BAR1             0x14
 
 uint64 NAMBA;               // BAR0 - Native Audio Mixer Base Address
-#define RESET               0x00
-#define MA_VOLUME           0x02
+#define RESET                       0x00
+#define MA_VOLUME                   0x02
+#define PCM_OUT_VOLUME              0x18
 
 uint64 NABMBA;              // BAR1 - Native Audio Bus Master Base Address
-#define GLOBAL_CONTROL      0x2C
-#define GLOBAL_STATUS       0x30
+#define PCM_OUT_BDLBA               0x10
+#define PCM_OUT_TRANSFER_CONTROL    0x1B
+#define GLOBAL_CONTROL              0x2C
+#define GLOBAL_STATUS               0x30
 
 struct spinlock sound_lock;
 
@@ -100,12 +103,68 @@ void ac97_device_init(uint64 pci_addr)
         return;
     }
 
-    // Reset NAM Registers
-    // WriteRegShort(PCIE_PIO | (NAMBA + RESET), 0x1);
-
     // Update PCIe Audio Subsystem ID
     uint32 v01 = ReadRegShort(PCIE_PIO | (NAMBA + 0x7C));
     uint32 v02 = ReadRegShort(PCIE_PIO | (NAMBA + 0x7E));
     uint32 v00 = (v02 << 16) + v01;
     WriteRegInt(pci_addr + 0x2C, v00);
+
+    // Reset NAM Registers
+    WriteRegShort(PCIE_PIO | (NAMBA + RESET), 0x1);
+}
+
+uint64 BDL[32];
+uint8 BDL_h, BDL_t;
+
+void BDL_add_entry(uint64 entry)
+{
+    acquire(&sound_lock);
+    // Do something
+    release(&sound_lock);
+}
+
+void start_play()
+{
+    // Set Volume
+    WriteRegShort((PCIE_PIO | (NAMBA + MA_VOLUME)), 0x0);
+    WriteRegShort((PCIE_PIO | (NAMBA + PCM_OUT_VOLUME)), 0x808);
+    
+    // BDL initialization
+    // todo: Do something
+    
+    // Reset Transfer Control
+    WriteRegByte((PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_CONTROL)), 0x2);
+    while((ReadRegByte(PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_CONTROL))) & 0x2);
+
+    // Write BDL info
+    WriteRegInt((PCIE_PIO | (NABMBA + PCM_OUT_BDLBA)), ((uint32)(&BDL) & 0xFFFFFFF8));
+
+    // Start Transfer
+    WriteRegByte((PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_CONTROL)), 0x1);
+}
+
+void pause_play()
+{
+    uchar tmp = ReadRegByte(PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_CONTROL));
+    tmp &= 0xFE;    // Clear Bit 0
+    WriteRegByte((PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_CONTROL)), tmp);
+}
+
+void continue_play()
+{
+    uchar tmp = ReadRegByte(PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_CONTROL));
+    tmp |= 0x1;    // Set Bit 0
+    WriteRegByte((PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_CONTROL)), tmp);
+}
+
+void stop_play()
+{
+    pause_play();
+    // Reset Transfer Control
+    WriteRegByte((PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_CONTROL)), 0x2);
+}
+
+void set_volume(ushort volume)
+{
+    WriteRegShort((PCIE_PIO | (NAMBA + MA_VOLUME)), volume);
 }
