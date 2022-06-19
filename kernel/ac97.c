@@ -10,6 +10,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "ac97.h"
 
 volatile uchar* RegByte(uint64 reg) {return (volatile uchar *)(reg);}
 volatile uint32* RegInt(uint64 reg) {return (volatile uint32 *)(reg);}
@@ -35,6 +36,9 @@ uint64 NAMBA;               // BAR0 - Native Audio Mixer Base Address
 
 uint64 NABMBA;              // BAR1 - Native Audio Bus Master Base Address
 #define PCM_OUT_BDLBA               0x10
+#define PCM_OUT_CUR                 0x14
+#define PCM_OUT_LVE                 0x15
+#define PCM_OUT_TRANSFER_STATUS     0x16
 #define PCM_OUT_TRANSFER_CONTROL    0x1B
 #define GLOBAL_CONTROL              0x2C
 #define GLOBAL_STATUS               0x30
@@ -114,12 +118,23 @@ void ac97_device_init(uint64 pci_addr)
 }
 
 uint64 BDL[32];
-uint8 BDL_h, BDL_t;
+struct audionode *shead, *stail;
 
-void BDL_add_entry(uint64 entry)
+void BDL_add_entry(struct audionode *node)
 {
     acquire(&sound_lock);
-    // Do something
+    
+    node->next = 0;
+    node->used = 0;
+
+    if(!shead)
+        shead = stail = node;
+    else
+    {
+        stail->next = node;
+        stail = node;
+    }
+
     release(&sound_lock);
 }
 
@@ -130,7 +145,15 @@ void start_play()
     WriteRegShort((PCIE_PIO | (NAMBA + PCM_OUT_VOLUME)), 0x808);
     
     // BDL initialization
-    // todo: Do something
+    acquire(&sound_lock);
+    if(!shead)
+    {
+        release(&sound_lock);
+        return;
+    }
+    for(int i = 0; i < 32; i++)
+        BDL[i] = ((uint64)(shead->data[i]) | (((uint64)(NUM_SAMPLE)) << 32));
+    release(&sound_lock);
     
     // Reset Transfer Control
     WriteRegByte((PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_CONTROL)), 0x2);
@@ -138,9 +161,33 @@ void start_play()
 
     // Write BDL info
     WriteRegInt((PCIE_PIO | (NABMBA + PCM_OUT_BDLBA)), ((uint32)(&BDL) & 0xFFFFFFF8));
+    WriteRegByte((PCIE_PIO | (NABMBA + PCM_OUT_LVE)), 0x1F);
 
     // Start Transfer
     WriteRegByte((PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_CONTROL)), 0x1);
+
+    // Update BDL
+    while(1)
+    {
+        if(ReadRegShort(PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_STATUS)) & 0x2)
+        {
+            acquire(&sound_lock);
+
+            shead->used = 1;
+            shead = shead->next;
+
+            if(!shead)
+            {
+                release(&sound_lock);
+                return;
+            }
+            for(int i = 0; i < 32; i++)
+                BDL[i] = ((uint64)(shead->data[i]) | (((uint64)(NUM_SAMPLE)) << 32));
+            shead = shead->next;
+
+            release(&sound_lock);
+        }
+    }
 }
 
 void pause_play()
@@ -160,8 +207,19 @@ void continue_play()
 void stop_play()
 {
     pause_play();
+    
     // Reset Transfer Control
     WriteRegByte((PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_CONTROL)), 0x2);
+    
+    // Release audiolist
+    acquire(&sound_lock);
+    while(shead)
+    {
+        shead->used = 1;
+        shead = shead->next;
+    }
+    shead = stail = 0;
+    release(&sound_lock);
 }
 
 void set_volume(ushort volume)
