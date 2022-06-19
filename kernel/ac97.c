@@ -160,7 +160,7 @@ void start_play()
     while((ReadRegByte(PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_CONTROL))) & 0x2);
 
     // Write BDL info
-    WriteRegInt((PCIE_PIO | (NABMBA + PCM_OUT_BDLBA)), ((uint32)(&BDL) & 0xFFFFFFF8));
+    WriteRegInt((PCIE_PIO | (NABMBA + PCM_OUT_BDLBA)), ((uint64)(&BDL) & 0xFFFFFFF8));
     WriteRegByte((PCIE_PIO | (NABMBA + PCM_OUT_LVE)), 0x1F);
 
     // Start Transfer
