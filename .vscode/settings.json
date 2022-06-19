@@ -5,6 +5,9 @@
         "stdarg.h": "c",
         "pci.h": "c",
         "proc.h": "c",
-        "memlayout.h": "c"
+        "memlayout.h": "c",
+        "stat.h": "c",
+        "user.h": "c",
+        "ac97.h": "c"
     }
 }
