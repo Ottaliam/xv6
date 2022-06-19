@@ -104,6 +104,12 @@ extern uint64 sys_unlink(void);
 extern uint64 sys_wait(void);
 extern uint64 sys_write(void);
 extern uint64 sys_uptime(void);
+extern uint64 sys_addaudio(void);
+extern uint64 sys_startplay(void);
+extern uint64 sys_pauseplay(void);
+extern uint64 sys_continueplay(void);
+extern uint64 sys_stopplay(void);
+extern uint64 sys_setvolume(void);
 
 static uint64 (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -127,6 +133,12 @@ static uint64 (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
+[SYS_addaudio]  sys_addaudio,
+[SYS_startplay] sys_startplay,
+[SYS_pauseplay] sys_pauseplay,
+[SYS_continueplay]  sys_continueplay,
+[SYS_stopplay]  sys_stopplay,
+[SYS_setvolume] sys_setvolume
 };
 
 void

@@ -8,6 +8,7 @@
         "memlayout.h": "c",
         "stat.h": "c",
         "user.h": "c",
-        "ac97.h": "c"
+        "ac97.h": "c",
+        "syscall.h": "c"
     }
 }
