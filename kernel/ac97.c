@@ -115,6 +115,9 @@ void ac97_device_init(uint64 pci_addr)
 
     // Reset NAM Registers
     WriteRegShort(PCIE_PIO | (NAMBA + RESET), 0x1);
+
+    // 
+    picenable();
 }
 
 uint64 BDL[32];
