@@ -29,6 +29,7 @@
 #define PCIE_PIO        0x03000000L
 #define PCIE_ECAM       0x30000000L
 #define PCIE_MMIO       0x40000000L
+#define AC97_IRQ        33
 
 // core local interruptor (CLINT), which contains the timer.
 #define CLINT 0x2000000L

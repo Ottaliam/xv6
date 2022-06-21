@@ -11,6 +11,8 @@
         "ac97.h": "c",
         "syscall.h": "c",
         "param.h": "c",
-        "riscv.h": "c"
+        "riscv.h": "c",
+        "fcntl.h": "c",
+        "spinlock.h": "c"
     }
 }

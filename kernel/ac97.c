@@ -33,6 +33,7 @@ uint64 NAMBA;               // BAR0 - Native Audio Mixer Base Address
 #define RESET                       0x00
 #define MA_VOLUME                   0x02
 #define PCM_OUT_VOLUME              0x18
+#define SPR_FS                      0x2C
 
 uint64 NABMBA;              // BAR1 - Native Audio Bus Master Base Address
 #define PCM_OUT_BDLBA               0x10
@@ -44,6 +45,8 @@ uint64 NABMBA;              // BAR1 - Native Audio Bus Master Base Address
 #define GLOBAL_STATUS               0x30
 
 struct spinlock sound_lock;
+uint64 BDL[32];
+struct audionode *shead = 0, *stail = 0;
 
 // search for ac97 device and call for initialization
 void ac97_init()
@@ -88,7 +91,7 @@ void ac97_device_init(uint64 pci_addr)
     WriteRegByte(PCIE_PIO | (NABMBA + GLOBAL_CONTROL), 0x2);
     // printf("Reset Success\n");
 
-    // Wait For Codec to be Read
+    // Wait For Codec to be Ready
     uint32 wait_time = 1000;
     while(!(ReadRegShort(PCIE_PIO | (NABMBA + GLOBAL_STATUS)) & 0x100) && wait_time)
         --wait_time;
@@ -113,25 +116,22 @@ void ac97_device_init(uint64 pci_addr)
     uint32 v00 = (v02 << 16) + v01;
     WriteRegInt(pci_addr + 0x2C, v00);
 
-    // Reset NAM Registers
-    WriteRegShort(PCIE_PIO | (NAMBA + RESET), 0x1);
-
-    // 
-    picenable();
+    // Ready for play
+    WriteRegShort(PCIE_PIO | (NAMBA + MA_VOLUME), 0x0000);
+    shead = stail = 0;
 }
 
-uint64 BDL[32];
-struct audionode *shead, *stail;
-
-void BDL_add_entry(struct audionode *node)
+void add_sound(struct audionode *node)
 {
     acquire(&sound_lock);
-    
-    node->next = 0;
-    node->used = 0;
 
-    if(!shead)
+    node->next = 0;
+
+    if(shead == 0)
+    {
         shead = stail = node;
+        start_play();
+    }
     else
     {
         stail->next = node;
@@ -143,6 +143,30 @@ void BDL_add_entry(struct audionode *node)
 
 void start_play()
 {
+    printf("START PLAY\n");
+
+    // Write audionode to BDL
+    for(int i = 0; i < 32; i++)
+        BDL[i] = ((uint64)(shead->data[i]) | (((uint64)(NUM_SAMPLE | 0x80000000)) << 32));
+    
+    // Write BDL base address
+    WriteRegInt((PCIE_PIO | (NABMBA + PCM_OUT_BDLBA)), ((uint64)(&BDL) & 0xFFFFFFF8));
+
+    // Set Last Buffer Entry
+    WriteRegByte((PCIE_PIO | (NABMBA + PCM_OUT_LVE)), 0x1F);
+
+    // Start Transfer with LVE interrupt enabled
+    WriteRegByte((PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_CONTROL)), 0x5);
+
+    /*
+    printf("START PLAY2\n");
+    int cnt = 0;
+    while(cnt < 1000)
+        printf("%d\n", cnt++);
+    printf("Now Processing: %d\n", ReadRegByte(PCIE_PIO | (NABMBA + PCM_OUT_CUR)));
+    */
+    
+    /*
     // Set Volume
     WriteRegShort((PCIE_PIO | (NAMBA + MA_VOLUME)), 0x0);
     WriteRegShort((PCIE_PIO | (NAMBA + PCM_OUT_VOLUME)), 0x808);
@@ -176,7 +200,9 @@ void start_play()
         {
             acquire(&sound_lock);
 
-            shead->used = 1;
+            printf("CONSUMED\n");
+
+            shead->flag = 0;
             shead = shead->next;
 
             if(!shead)
@@ -191,41 +217,80 @@ void start_play()
             release(&sound_lock);
         }
     }
+    */
+}
+
+void sound_interrupt()
+{
+    acquire(&sound_lock);
+
+    // Make it free again
+    shead->flag = 0;
+    shead = shead->next;
+
+    if(shead == 0)  // no audio left
+    {
+        // Clear Interrupt
+        ushort tmp = ReadRegShort(PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_STATUS));
+        WriteRegShort((PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_STATUS)), tmp);
+
+        release(&sound_lock);
+        return;
+    }
+
+    // Load next audionode to BDL
+    for(int i = 0; i < 32; i++)
+        BDL[i] = ((uint64)(shead->data[i]) | (((uint64)(NUM_SAMPLE | 0x80000000)) << 32));
+    
+    // Clear Interrupt
+    ushort tmp = ReadRegShort(PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_STATUS));
+    WriteRegShort((PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_STATUS)), tmp);
+
+    // Continue Transfer
+    WriteRegByte((PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_CONTROL)), 0x5);
+
+    release(&sound_lock);
 }
 
 void pause_play()
 {
     uchar tmp = ReadRegByte(PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_CONTROL));
-    tmp &= 0xFE;    // Clear Bit 0
-    WriteRegByte((PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_CONTROL)), tmp);
+    if(tmp == 0x05) // Playing
+    {
+        printf("Now Paused\n");
+        WriteRegByte((PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_CONTROL)), 0x00);
+    }
+    else
+        printf("Already Paused or Not Playing\n");
 }
 
 void continue_play()
 {
     uchar tmp = ReadRegByte(PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_CONTROL));
-    tmp |= 0x1;    // Set Bit 0
-    WriteRegByte((PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_CONTROL)), tmp);
+    if(tmp == 0x00) // Paused
+    {
+        printf("Now Playing");
+        WriteRegByte((PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_CONTROL)), 0x05);
+    }
+    else
+    {
+        printf("Already Playing\n");
+        printf("%d\n", tmp);
+    }
 }
 
 void stop_play()
 {
-    pause_play();
-    
-    // Reset Transfer Control
-    WriteRegByte((PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_CONTROL)), 0x2);
-    
-    // Release audiolist
-    acquire(&sound_lock);
-    while(shead)
-    {
-        shead->used = 1;
-        shead = shead->next;
-    }
+    WriteRegByte((PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_CONTROL)), 0x05);
     shead = stail = 0;
-    release(&sound_lock);
 }
 
 void set_volume(ushort volume)
 {
     WriteRegShort((PCIE_PIO | (NAMBA + MA_VOLUME)), volume);
+}
+
+void set_sample_rate(ushort sample_rate)
+{
+    WriteRegShort((PCIE_PIO | (NAMBA + SPR_FS)), sample_rate);
 }
