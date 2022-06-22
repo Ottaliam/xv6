@@ -116,8 +116,9 @@ void ac97_device_init(uint64 pci_addr)
     uint32 v00 = (v02 << 16) + v01;
     WriteRegInt(pci_addr + 0x2C, v00);
 
-    // Ready for play
+    // Unmute, ready for play
     WriteRegShort(PCIE_PIO | (NAMBA + MA_VOLUME), 0x0000);
+    WriteRegShort((PCIE_PIO | (NAMBA + PCM_OUT_VOLUME)), 0x808);
     shead = stail = 0;
 }
 
@@ -157,67 +158,6 @@ void start_play()
 
     // Start Transfer with LVE interrupt enabled
     WriteRegByte((PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_CONTROL)), 0x5);
-
-    /*
-    printf("START PLAY2\n");
-    int cnt = 0;
-    while(cnt < 1000)
-        printf("%d\n", cnt++);
-    printf("Now Processing: %d\n", ReadRegByte(PCIE_PIO | (NABMBA + PCM_OUT_CUR)));
-    */
-    
-    /*
-    // Set Volume
-    WriteRegShort((PCIE_PIO | (NAMBA + MA_VOLUME)), 0x0);
-    WriteRegShort((PCIE_PIO | (NAMBA + PCM_OUT_VOLUME)), 0x808);
-    
-    // BDL initialization
-    acquire(&sound_lock);
-    if(!shead)
-    {
-        release(&sound_lock);
-        return;
-    }
-    for(int i = 0; i < 32; i++)
-        BDL[i] = ((uint64)(shead->data[i]) | (((uint64)(NUM_SAMPLE)) << 32));
-    release(&sound_lock);
-    
-    // Reset Transfer Control
-    WriteRegByte((PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_CONTROL)), 0x2);
-    while((ReadRegByte(PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_CONTROL))) & 0x2);
-
-    // Write BDL info
-    WriteRegInt((PCIE_PIO | (NABMBA + PCM_OUT_BDLBA)), ((uint64)(&BDL) & 0xFFFFFFF8));
-    WriteRegByte((PCIE_PIO | (NABMBA + PCM_OUT_LVE)), 0x1F);
-
-    // Start Transfer
-    WriteRegByte((PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_CONTROL)), 0x1);
-
-    // Update BDL
-    while(1)
-    {
-        if(ReadRegShort(PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_STATUS)) & 0x2)
-        {
-            acquire(&sound_lock);
-
-            printf("CONSUMED\n");
-
-            shead->flag = 0;
-            shead = shead->next;
-
-            if(!shead)
-            {
-                release(&sound_lock);
-                return;
-            }
-            for(int i = 0; i < 32; i++)
-                BDL[i] = ((uint64)(shead->data[i]) | (((uint64)(NUM_SAMPLE)) << 32));
-            shead = shead->next;
-
-            release(&sound_lock);
-        }
-    }
-    */
 }
 
 void sound_interrupt()
@@ -226,6 +166,8 @@ void sound_interrupt()
 
     // Make it free again
     shead->flag = 0;
+    printf("Sound Consumed at %p\n", shead);
+
     shead = shead->next;
 
     if(shead == 0)  // no audio left
@@ -233,6 +175,8 @@ void sound_interrupt()
         // Clear Interrupt
         ushort tmp = ReadRegShort(PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_STATUS));
         WriteRegShort((PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_STATUS)), tmp);
+
+        printf("Play Finished\n");
 
         release(&sound_lock);
         return;

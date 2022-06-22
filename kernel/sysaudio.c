@@ -91,6 +91,8 @@ uint64 sys_writeaudio(void)
     while(suc)
     {
         for(int i = 0; i < 3; ++i)
+        {
+            printf("");
             if(nodes[i].flag == 0)
             {
                 memset(nodes[i].data, 0, 32 * NUM_SAMPLE * 2);
@@ -99,10 +101,12 @@ uint64 sys_writeaudio(void)
                 nodes[i].next = 0;
 
                 add_sound(&nodes[i]);
+                printf("Sound Added at %p with size %d\n", &nodes[i], size);
 
                 suc = 0;
                 break;
             }
+        }
     }
     return 0;
 }

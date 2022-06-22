@@ -5,6 +5,7 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "ac97.h"
 
 struct spinlock tickslock;
 uint ticks;
@@ -189,6 +190,8 @@ devintr()
       uartintr();
     } else if(irq == VIRTIO0_IRQ){
       virtio_disk_intr();
+    } else if(irq == AC97_IRQ){
+      sound_interrupt();
     } else if(irq){
       printf("unexpected interrupt irq=%d\n", irq);
     }
