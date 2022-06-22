@@ -101,7 +101,6 @@ uint64 sys_writeaudio(void)
                 nodes[i].next = 0;
 
                 add_sound(&nodes[i]);
-                printf("Sound Added at %p with size %d\n", &nodes[i], size);
 
                 suc = 0;
                 break;

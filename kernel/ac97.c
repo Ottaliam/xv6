@@ -144,7 +144,7 @@ void add_sound(struct audionode *node)
 
 void start_play()
 {
-    printf("START PLAY\n");
+    printf("Play Start\n");
 
     // Write audionode to BDL
     for(int i = 0; i < 32; i++)
@@ -166,8 +166,6 @@ void sound_interrupt()
 
     // Make it free again
     shead->flag = 0;
-    printf("Sound Consumed at %p\n", shead);
-
     shead = shead->next;
 
     if(shead == 0)  // no audio left
@@ -176,7 +174,7 @@ void sound_interrupt()
         ushort tmp = ReadRegShort(PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_STATUS));
         WriteRegShort((PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_STATUS)), tmp);
 
-        printf("Play Finished\n");
+        printf("Play Finished\n\n");
 
         release(&sound_lock);
         return;
@@ -213,7 +211,7 @@ void continue_play()
     uchar tmp = ReadRegByte(PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_CONTROL));
     if(tmp == 0x00) // Paused
     {
-        printf("Now Playing");
+        printf("Now Playing\n");
         WriteRegByte((PCIE_PIO | (NABMBA + PCM_OUT_TRANSFER_CONTROL)), 0x05);
     }
     else
