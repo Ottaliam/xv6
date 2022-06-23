@@ -147,7 +147,7 @@ int main(int argc, char *argv[])
     }
     else
     {
-        fprintf(2, "Usage: audio play/pause/stop/volume\n");
+        fprintf(2, "Usage: audio play/pause/continue/stop/volume\n");
         exit(1);
     }
 
