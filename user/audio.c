@@ -137,7 +137,7 @@ int main(int argc, char *argv[])
         }
 
         int val = atoi(argv[2]);
-        if(val < 0 || val > 100)
+        if(val < 0 || val > 63)
         {
             fprintf(2, "Usage: audio volume xxx(0-100)\n");
             exit(1);

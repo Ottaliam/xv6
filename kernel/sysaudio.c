@@ -51,10 +51,10 @@ uint64 sys_setvolume(void)
     if(argint(0, &val) < 0)
         return -1;
     
-    if(val < 0 || val > 100)
+    if(val < 0 || val > 63)
         return -1;
-
-    val = (100.0 - val) / 100.0 * 63.0;
+    
+    val = 0x3F - val;
     set_volume(((val & 0x3F) << 8) | (val & 0x3F));
 
     return 0;
